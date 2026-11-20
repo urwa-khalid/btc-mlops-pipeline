@@ -1,0 +1,1 @@
+{"mae": 6451.50189732143, "rmse": 6954.045808913619, "mape": 10.355637695172227, "naive_mae": 5002.611049107143, "test_start": "2026-11-14", "test_end": "2026-11-20", "model_version": "20261120-202705", "trained_rows": 1467, "threshold_mape": 15.0, "registered": true}

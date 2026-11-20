@@ -125,5 +125,11 @@ if __name__ == "__main__":
     parser.add_argument("--data", default=DATA_PATH)
     parser.add_argument("--model-dir", default=MODEL_DIR)
     parser.add_argument("--max-mape", type=float, default=None)
+    parser.add_argument(
+        "--result-json", default=None, help="write the metrics dict here"
+    )
     args = parser.parse_args()
-    train(args.data, args.model_dir, args.max_mape)
+    result = train(args.data, args.model_dir, args.max_mape)
+    if args.result_json:
+        Path(args.result_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.result_json).write_text(json.dumps(result))

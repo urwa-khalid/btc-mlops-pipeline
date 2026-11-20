@@ -1,6 +1,9 @@
 """Daily BTC-USD pipeline: fetch -> preprocess -> retrain/evaluate -> reload API."""
 
+import json
 import os
+import subprocess
+import sys
 from datetime import datetime, timedelta
 
 from airflow import DAG
@@ -8,6 +11,7 @@ from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
 DATA_DIR = os.getenv("DATA_DIR", "/opt/airflow/data")
 MODEL_DIR = os.getenv("MODEL_DIR", "/opt/airflow/models")
+SRC_DIR = os.getenv("SRC_DIR", "/opt/airflow/src")
 RAW_PATH = f"{DATA_DIR}/raw/btc_usd.csv"
 PROCESSED_PATH = f"{DATA_DIR}/processed/btc_features.csv"
 API_RELOAD_URL = os.getenv("API_RELOAD_URL", "http://api:5000/reload")
@@ -30,10 +34,33 @@ def preprocess_data() -> int:
 
 
 def train_and_evaluate() -> dict:
-    """Task 3: retrain, evaluate on the latest 7-day window, register if it passes."""
-    from train_forecast import train
+    """Task 3: retrain, evaluate on the latest 7-day window, register if it passes.
 
-    return train(PROCESSED_PATH, MODEL_DIR, max_mape=MAX_MAPE)
+    Training runs in a fresh Python process so the saved model file is not
+    affected by anything Airflow itself imports or patches.
+    """
+    result_path = f"{DATA_DIR}/last_training_result.json"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            os.path.join(SRC_DIR, "train_forecast.py"),
+            "--data",
+            PROCESSED_PATH,
+            "--model-dir",
+            MODEL_DIR,
+            "--max-mape",
+            str(MAX_MAPE),
+            "--result-json",
+            result_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    print(proc.stdout)
+    print(proc.stderr)
+    proc.check_returncode()
+    with open(result_path) as handle:
+        return json.load(handle)
 
 
 def metrics_passed(ti) -> bool:
