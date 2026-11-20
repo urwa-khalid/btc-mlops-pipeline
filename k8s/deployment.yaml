@@ -20,8 +20,8 @@ spec:
         fsGroup: 10001
       containers:
         - name: api
-          # replace YOUR_DOCKERHUB_USERNAME with your Docker Hub username
-          image: YOUR_DOCKERHUB_USERNAME/btc-forecast-api:latest
+          # replace clinophile with your Docker Hub username
+          image: clinophile/btc-forecast-api:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
