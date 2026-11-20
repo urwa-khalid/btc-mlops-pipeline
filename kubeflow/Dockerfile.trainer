@@ -1,0 +1,7 @@
+# Image used by the Kubeflow pipeline components.
+#   docker build -f kubeflow/Dockerfile.trainer -t <dockerhub-user>/btc-forecast-trainer:latest .
+FROM python:3.10-slim
+ENV PIP_NO_CACHE_DIR=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/src
+RUN pip install pandas numpy scikit-learn joblib yfinance requests
+WORKDIR /app
+COPY src ./src

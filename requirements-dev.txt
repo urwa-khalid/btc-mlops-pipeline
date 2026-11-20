@@ -1,0 +1,7 @@
+-r app/requirements.txt
+pytest>=8.0
+flake8>=7.0
+black>=24.0
+yfinance>=0.2.40
+requests>=2.31
+locust>=2.20

@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: btc-forecast-ingress
+  labels:
+    app: btc-forecast
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: btc-forecast.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: btc-forecast-svc
+                port:
+                  number: 80

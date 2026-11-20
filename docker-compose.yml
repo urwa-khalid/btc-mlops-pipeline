@@ -1,0 +1,76 @@
+# Local integration environment: Flask API + Postgres + Airflow.
+#   echo "AIRFLOW_UID=$(id -u)" > .env
+#   docker compose up --build
+# API: http://localhost:5000   Airflow UI: http://localhost:8080 (admin / admin)
+
+x-airflow-env: &airflow-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+  _PIP_ADDITIONAL_REQUIREMENTS: "scikit-learn joblib yfinance requests"
+  PYTHONPATH: /opt/airflow/src
+  DATA_DIR: /opt/airflow/data
+  MODEL_DIR: /opt/airflow/models
+  API_RELOAD_URL: http://api:5000/reload
+  RELOAD_TOKEN: ${RELOAD_TOKEN:-change-me}
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: btc-forecast-api:local
+    ports:
+      - "5000:5000"
+    environment:
+      MODEL_STAGE: local
+      LOG_LEVEL: INFO
+      RELOAD_TOKEN: ${RELOAD_TOKEN:-change-me}
+    volumes:
+      # shared with Airflow: retrained models land here and the API picks them up
+      - ./models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 15s
+      retries: 5
+    restart: unless-stopped
+
+  airflow:
+    image: apache/airflow:2.9.3-python3.10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    user: "${AIRFLOW_UID:-50000}:0"
+    environment: *airflow-env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+      - ./models:/opt/airflow/models
+    command: >
+      bash -c "airflow db migrate &&
+      airflow users create --username admin --password admin --firstname Admin
+      --lastname User --role Admin --email admin@example.com || true;
+      airflow scheduler & exec airflow webserver"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

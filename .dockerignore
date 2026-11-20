@@ -1,0 +1,12 @@
+.git
+.github
+__pycache__
+*.pyc
+.venv
+data
+tests
+k8s
+dags
+kubeflow
+report
+load

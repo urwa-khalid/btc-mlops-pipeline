@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: btc-forecast
+  labels:
+    app: btc-forecast
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: btc-forecast
+  template:
+    metadata:
+      labels:
+        app: btc-forecast
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: api
+          # replace YOUR_DOCKERHUB_USERNAME with your Docker Hub username
+          image: YOUR_DOCKERHUB_USERNAME/btc-forecast-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: btc-forecast-config
+            - secretRef:
+                name: btc-forecast-secret
+          env:
+            - name: MODEL_DIR
+              value: /app/models
+          volumeMounts:
+            - name: model-storage
+              mountPath: /app/models
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: btc-models-pvc

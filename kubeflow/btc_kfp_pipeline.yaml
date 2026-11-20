@@ -1,0 +1,134 @@
+# PIPELINE DEFINITION
+# Name: btc-forecast-pipeline
+# Description: Daily BTC-USD ingestion, feature generation and 7-day model training
+# Inputs:
+#    max_mape: float [Default: 15.0]
+components:
+  comp-generate-features:
+    executorLabel: exec-generate-features
+    inputDefinitions:
+      artifacts:
+        raw_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-ingest-data:
+    executorLabel: exec-ingest-data
+    outputDefinitions:
+      artifacts:
+        raw_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        features:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        max_mape:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-generate-features:
+      container:
+        args:
+        - --input
+        - '{{$.inputs.artifacts[''raw_data''].path}}'
+        - --output
+        - '{{$.outputs.artifacts[''features''].path}}'
+        command:
+        - python
+        - /app/src/preprocess.py
+        image: docker.io/YOUR_DOCKERHUB_USERNAME/btc-forecast-trainer:latest
+    exec-ingest-data:
+      container:
+        args:
+        - --output
+        - '{{$.outputs.artifacts[''raw_data''].path}}'
+        command:
+        - python
+        - /app/src/etl_fetch.py
+        image: docker.io/YOUR_DOCKERHUB_USERNAME/btc-forecast-trainer:latest
+    exec-train-model:
+      container:
+        args:
+        - --data
+        - '{{$.inputs.artifacts[''features''].path}}'
+        - --model-dir
+        - '{{$.outputs.artifacts[''model''].path}}'
+        - --max-mape
+        - '{{$.inputs.parameters[''max_mape'']}}'
+        command:
+        - python
+        - /app/src/train_forecast.py
+        image: docker.io/YOUR_DOCKERHUB_USERNAME/btc-forecast-trainer:latest
+pipelineInfo:
+  description: Daily BTC-USD ingestion, feature generation and 7-day model training
+  name: btc-forecast-pipeline
+root:
+  dag:
+    tasks:
+      generate-features:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-generate-features
+        dependentTasks:
+        - ingest-data
+        inputs:
+          artifacts:
+            raw_data:
+              taskOutputArtifact:
+                outputArtifactKey: raw_data
+                producerTask: ingest-data
+        taskInfo:
+          name: generate-features
+      ingest-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-ingest-data
+        taskInfo:
+          name: ingest-data
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - generate-features
+        inputs:
+          artifacts:
+            features:
+              taskOutputArtifact:
+                outputArtifactKey: features
+                producerTask: generate-features
+          parameters:
+            max_mape:
+              componentInputParameter: max_mape
+        taskInfo:
+          name: train-model
+  inputDefinitions:
+    parameters:
+      max_mape:
+        defaultValue: 15.0
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.18.1
